@@ -8,8 +8,6 @@ import org.mortbay.jetty.handler.HandlerCollection;
 import org.mortbay.jetty.security.SslSocketConnector;
 import org.mortbay.jetty.webapp.WebAppContext;
 
-import au.edu.educationau.opensource.spring20.EnvironmentPropertyConfigurer;
-
 /**
  * <p>Use this in development to run a Jetty instance which will use the classes + resources straight out of the source tree (ie. no need to package + redeploy
  * etc. each time a file is changed). The expanded web application will be run from the directory <tt>src/main/webapp</tt> relative to the project root.</p>
@@ -29,8 +27,6 @@ import au.edu.educationau.opensource.spring20.EnvironmentPropertyConfigurer;
  * <p>Note that the the web application will be loaded before the webserver ports are set. This means that code in the web application has a 
  * chance to set the relevent system properties. This enables the use of {@link EnvironmentPropertyConfigurer} for configuration.
  * 
- * @author bslattery
- * @author nlothian
  */
 public class TestWebServer {
 	public static void main(String[] args) throws Exception {
@@ -57,6 +53,7 @@ public class TestWebServer {
 		SocketConnector connector = new SocketConnector();
 		connector.setPort(port);
 		server.addConnector(connector);
+		connector.start();
 		
 		int sslport = 443;
 		boolean usingHttps = false;
@@ -80,6 +77,7 @@ public class TestWebServer {
 			sslConnector.setTrustPassword(System.getProperty("test.webserver.ssl.trustpassword", "password"));		
 			
 			server.addConnector(sslConnector);
+			sslConnector.start();
 			usingHttps = true;
 		}
 		
