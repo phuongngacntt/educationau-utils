@@ -1,5 +1,8 @@
 package au.edu.educationau.opensource.devsupport;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.mortbay.jetty.Handler;
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.bio.SocketConnector;
@@ -7,6 +10,8 @@ import org.mortbay.jetty.handler.DefaultHandler;
 import org.mortbay.jetty.handler.HandlerCollection;
 import org.mortbay.jetty.security.SslSocketConnector;
 import org.mortbay.jetty.webapp.WebAppContext;
+
+import au.edu.educationau.opensource.spring20.EnvironmentPropertyConfigurer;
 
 /**
  * <p>Use this in development to run a Jetty instance which will use the classes + resources straight out of the source tree (ie. no need to package + redeploy
@@ -32,14 +37,34 @@ public class TestWebServer {
 	public static void main(String[] args) throws Exception {
 		Server server = new Server(); // don't specify the port here
 		
-		WebAppContext webappcontext = new WebAppContext();
-		webappcontext.setContextPath("/");
-		webappcontext.setWar("src/main/webapp");
-
-		HandlerCollection handlers = new HandlerCollection();
-		handlers.setHandlers(new Handler[] { webappcontext, new DefaultHandler() });		
+		WebAppContext firstWebappContext = new WebAppContext();
+		firstWebappContext.setContextPath(System.getProperty("test.webserver.webapp.context") != null ? System.getProperty("test.webserver.webapp.context") : "/");
+		firstWebappContext.setWar(System.getProperty("test.webserver.webapp.war") != null ? System.getProperty("test.webserver.webapp.war") : "src/main/webapp");
 		
-		server.setHandler(handlers);
+		List<Handler> handlerList = new ArrayList<Handler>();
+		
+		// add extra webapps if configured by properties "test.webserver.webapp2.context" etc.
+		for (int i = 2; i < 100; i++) {
+			if (System.getProperty("test.webserver.webapp" + i + ".context") != null) {
+				WebAppContext extraWebappContext = new WebAppContext();
+				extraWebappContext.setContextPath(System.getProperty("test.webserver.webapp" + i + ".context"));
+				if (System.getProperty("test.webserver.webapp" + i + ".war") == null) {
+					throw new RuntimeException("No war folder specified for webapp " + i);
+				}
+				extraWebappContext.setWar(System.getProperty("test.webserver.webapp" + i + ".war"));
+				handlerList.add(extraWebappContext);
+			}
+		}
+		
+		// NOTE: the reason the "first" context is in the list after the extra ones, is because it's usually "/" context - 
+		// if it was first in the list, Jetty won't let other contexts register (i.e. "/" will swallow all requests) 
+		handlerList.add(firstWebappContext);
+		handlerList.add(new DefaultHandler());
+		
+		HandlerCollection handlerCollection = new HandlerCollection();
+		handlerCollection.setHandlers(handlerList.toArray(new Handler[0]));		
+		
+		server.setHandler(handlerCollection);
 		
 		// Start the server before adding the connectors
 		// This allows the web-app to load, so if system properties are set inside the application they will be available
