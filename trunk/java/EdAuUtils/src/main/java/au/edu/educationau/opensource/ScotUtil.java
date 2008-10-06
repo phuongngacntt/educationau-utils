@@ -174,21 +174,85 @@ public class ScotUtil {
 	}
 
 	public static class Term {
-		Integer termNumber; // mandatory
-		String name; // mandatory
+		private Integer termNumber; // mandatory
+		private String name; // mandatory
 
-		String scopeNote; // often null
+		private String scopeNote; // often null
 
-		Term use; // if not null, this term is "non-preferred"
+		private Term use; // if not null, this term is "non-preferred"
 
-		List<Term> usedFor = new ArrayList<Term>(); // references to non-preferred terms that this term replaces
-		List<Term> broaderTerms = new ArrayList<Term>(); // parent terms
-		List<Term> narrowerTerms = new ArrayList<Term>(); // child terms
-		List<Term> relatedTerms = new ArrayList<Term>();
+		private List<Term> usedFor = new ArrayList<Term>(); // references to non-preferred terms that this term replaces
+		private List<Term> broaderTerms = new ArrayList<Term>(); // parent terms
+		private List<Term> narrowerTerms = new ArrayList<Term>(); // child terms
+		private List<Term> relatedTerms = new ArrayList<Term>();
 
 		@Override
 		public String toString() {
 			return "Name: " + name + "\n" + "Number: " + termNumber + "\n" + "Scope note: " + scopeNote + "\n";
+		}
+
+		public Integer getTermNumber() {
+			return termNumber;
+		}
+
+		public void setTermNumber(Integer termNumber) {
+			this.termNumber = termNumber;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+
+		public String getScopeNote() {
+			return scopeNote;
+		}
+
+		public void setScopeNote(String scopeNote) {
+			this.scopeNote = scopeNote;
+		}
+
+		public Term getUse() {
+			return use;
+		}
+
+		public void setUse(Term use) {
+			this.use = use;
+		}
+
+		public List<Term> getUsedFor() {
+			return usedFor;
+		}
+
+		public void setUsedFor(List<Term> usedFor) {
+			this.usedFor = usedFor;
+		}
+
+		public List<Term> getBroaderTerms() {
+			return broaderTerms;
+		}
+
+		public void setBroaderTerms(List<Term> broaderTerms) {
+			this.broaderTerms = broaderTerms;
+		}
+
+		public List<Term> getNarrowerTerms() {
+			return narrowerTerms;
+		}
+
+		public void setNarrowerTerms(List<Term> narrowerTerms) {
+			this.narrowerTerms = narrowerTerms;
+		}
+
+		public List<Term> getRelatedTerms() {
+			return relatedTerms;
+		}
+
+		public void setRelatedTerms(List<Term> relatedTerms) {
+			this.relatedTerms = relatedTerms;
 		}
 	}
 }
