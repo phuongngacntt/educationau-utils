@@ -1,0 +1,153 @@
+#! /bin/sh
+### BEGIN INIT INFO
+#
+# chkconfig: 345 85 15
+# description: Tomcat Servlet Engine
+# processname: tomcat
+#
+
+
+############################################################################################
+# To install:
+# 1) Rename it to something sensible (tomcat-<app-name> is usually good)
+# 2) Copy it into /etc/init.d
+# 3) Edit the configuation infomation below
+# 4) Add it to the runtime services using chkconfig: sudo /sbin/chkconfig --add <scriptname>
+# 5) Optionally edit the runlevels it will start at using /sbin/chkconfig command
+#
+# THE FOLLOWING ITEMS MUST BE EDITIED FOR YOUR INSTALLATION
+#############################################################################################
+
+# User under which tomcat will run
+TOMCAT_USER=
+
+# The path to the installation
+TOMCAT_PATH=
+
+# The port the shutdown service listens on.
+# This can be found by looking in $TOMCAT_PATH/conf/server.xml
+SHUTDOWN_PORTNUM=
+
+
+#############################################################################################
+
+
+# Use the scriptname as the lock name. This saves on things needed to configure
+scriptname=$0
+filename=${scriptname##/etc/init.d/}
+LOCK_NAME=$filename
+
+
+export CATALINA_PID="$TOMCAT_PATH/bin/tomcat.pid"
+export CATALINA_HOME=$TOMCAT_PATH
+
+RETVAL=0
+
+# start, debug, stop, and status functions
+start() {
+    # Start Tomcat in normal mode
+    SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+    if [ $SHUTDOWN_PORT -ne 0 ]; then
+        echo "Tomcat already started"
+    else
+        echo "Starting tomcat..."
+        chown -R $TOMCAT_USER:$TOMCAT_USER $TOMCAT_PATH/*
+        su $TOMCAT_USER -c "cd $TOMCAT_PATH/bin; $TOMCAT_PATH/bin/startup.sh"
+	SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+        while [ $SHUTDOWN_PORT -eq 0 ]; do
+            sleep 1
+            SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+        done	
+        RETVAL=$?
+        echo "Tomcat started in normal mode"
+        [ $RETVAL=0 ] && touch /var/lock/subsys/$LOCK_NAME
+    fi
+}
+
+debug() {
+    # Start Tomcat in debug mode
+    SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+    if [ $SHUTDOWN_PORT -ne 0 ]; then
+        echo "Tomcat already started"
+    else
+        echo "Starting tomcat in debug mode..."
+        chown -R $TOMCAT_USER:$TOMCAT_USER $TOMCAT_PATH/*
+        su -l $TOMCAT_USER -c "cd $TOMCAT_PATH/bin; $TOMCAT_PATH/bin/catalina.sh jpda start"
+	SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+        while [ $SHUTDOWN_PORT -eq 0 ]; do
+            sleep 1
+            SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+        done	
+        RETVAL=$?
+        echo "Tomcat started in debug mode"
+        [ $RETVAL=0 ] && touch /var/lock/subsys/$LOCK_NAME
+    fi
+}
+
+stop() {
+    SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+    if [ $SHUTDOWN_PORT -eq 0 ]; then
+        echo "Tomcat already stopped"
+    else
+        echo "Stopping tomcat..."
+        su $TOMCAT_USER -c "cd $TOMCAT_PATH/bin; $TOMCAT_PATH/bin/shutdown.sh"
+	SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+	LOOPCOUNT=0
+	MAXLOOPS=5
+        while [[ $SHUTDOWN_PORT -ne 0 && $LOOPCOUNT -lt $MAXLOOPS ]]; do
+            sleep 1
+            SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+	    let LOOPCOUNT=$LOOPCOUNT+1
+        done
+	if [[ $LOOPCOUNT -ge $MAXLOOPS ]]
+	then
+	    echo 'Waited too long - killing tomcat process'
+	    kill -9 `cat $CATALINA_PID`
+	fi
+	RETVAL=$?
+        echo "Tomcat stopped"
+        [ $RETVAL=0 ] && rm -f /var/lock/subsys/$LOCK_NAME $TOMCAT_PATH/bin/tomcat.pid
+    fi
+}
+
+status() {
+    SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+    if [ $SHUTDOWN_PORT -eq 0 ]; then
+        echo "Tomcat stopped"
+    else
+        MODE="normal"
+        JPDA_PORT=`netstat -vatn|grep LISTEN|grep 8000|wc -l`
+        if [ $JPDA_PORT -ne 0 ]; then
+            MODE="debug"
+        fi
+	echo "Tomcat running in $MODE mode"
+    fi
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  debug)
+        debug
+        ;;
+  stop)
+        stop
+        ;;
+  restart)
+        stop
+        start
+        ;;
+  redebug)
+        stop
+        debug
+        ;;
+  status)
+  	status
+	;;
+  *)
+	echo "Usage: $0 {start|debug|stop|restart|redebug|status}"
+	exit 1
+esac
+
+exit $RETVAL
