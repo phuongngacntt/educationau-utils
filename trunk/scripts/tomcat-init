@@ -13,7 +13,7 @@
 #
 # To install:
 # 1) Rename it to something sensible (tomcat-<app-name> is usually good)
-# 2) Copy it into /etc/init.d
+# 2) Copy it into /etc/init.d and make it executable (chmod +x <scriptname>)
 # 3) Edit the configuation infomation below
 # 4) Add it to the runtime services using chkconfig: sudo /sbin/chkconfig --add <scriptname>
 # 5) Optionally edit the runlevels it will start at using /sbin/chkconfig command
