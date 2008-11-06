@@ -8,6 +8,9 @@
 
 
 ############################################################################################
+#
+# Tomcat init script for RedHat/CentOS. Only the start and stop commands have been tested.
+#
 # To install:
 # 1) Rename it to something sensible (tomcat-<app-name> is usually good)
 # 2) Copy it into /etc/init.d
