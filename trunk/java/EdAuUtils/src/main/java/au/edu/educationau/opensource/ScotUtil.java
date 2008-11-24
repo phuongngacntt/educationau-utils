@@ -1,7 +1,6 @@
 package au.edu.educationau.opensource;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -25,7 +24,8 @@ import org.apache.commons.io.IOUtils;
  */
 public class ScotUtil {
 	private Map<String, Term> termsByName;
-
+	private Map<String, Term> termsByNameCaseInsensitive;
+	
 	private Map<Integer, Term> termsByNumber;
 
 	private List<Term> terms;
@@ -42,8 +42,10 @@ public class ScotUtil {
 		});
 
 		termsByNumber = new HashMap<Integer, Term>();
+		termsByNameCaseInsensitive = new HashMap<String, Term>();
 		for (Term term : terms) {
 			termsByNumber.put(term.termNumber, term);
+			termsByNameCaseInsensitive.put(term.name.toLowerCase(), term);
 		}
 	};
 
@@ -79,6 +81,10 @@ public class ScotUtil {
 	public Term findTerm(String termName) {
 		return termsByName.get(termName);
 	}
+	
+	public Term findTermCaseInsensitive(String termName) {
+		return termsByNameCaseInsensitive.get(termName.toLowerCase());
+	}
 
 	/**
 	 * Finds the term with given termNumber.
@@ -92,8 +98,13 @@ public class ScotUtil {
 	 */
 	public static ScotUtil create(String filePath) {
 		try {
-			return create(new FileInputStream(filePath));
-		} catch (FileNotFoundException e) {
+			FileInputStream in = new FileInputStream(filePath);
+			try {
+				return create(in);
+			} finally {
+				in.close();
+			}
+		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
 	}
