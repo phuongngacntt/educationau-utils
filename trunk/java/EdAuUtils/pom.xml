@@ -5,7 +5,7 @@
     <artifactId>EdAuUtils</artifactId>
     <packaging>jar</packaging>
     <name>EdAuUtils</name>
-    <version>0.9.3</version>
+    <version>0.9.5</version>
     <url>http://code.google.com/p/educationau-utils/</url>
     <description>education.au Utilities</description>
 
@@ -51,6 +51,7 @@
                      <target>1.5</target>
                  </configuration>
              </plugin>
+			 <!--
              <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.3.1-SNAPSHOT</version>
@@ -60,6 +61,7 @@
                     </excludes>
                 </configuration>            
             </plugin>
+			-->
         </plugins>
     </build>
 
