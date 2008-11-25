@@ -120,68 +120,72 @@ public class ScotUtil {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		String[] termDataStrings = scotData.split("(?s)\r\n\r\n");
+		try {
+			String[] termDataStrings = scotData.split("\r\n\r\n|\r\r|\n\n");
 
-		Map<Term, Map<String, List<String>>> termData = new HashMap<Term, Map<String, List<String>>>();
-		Map<String, Term> termsByName = new HashMap<String, Term>();
+			Map<Term, Map<String, List<String>>> termData = new HashMap<Term, Map<String, List<String>>>();
+			Map<String, Term> termsByName = new HashMap<String, Term>();
 
-		for (String termDataString : termDataStrings) {
-			String[] dataLines = termDataString.split("(?s)\r\n");
+			for (String termDataString : termDataStrings) {
+				String[] dataLines = termDataString.split("\r\n|\r|\n");
 
-			Term term = new Term();
-			term.name = dataLines[0];
-			termsByName.put(term.name, term);
+				Term term = new Term();
+				term.name = dataLines[0];
+				termsByName.put(term.name, term);
 
-			Map<String, List<String>> termFields = new HashMap<String, List<String>>();
-			String currentFieldName = null;
-			for (int i = 1; i < dataLines.length; i++) {
-				String dataLine = dataLines[i];
-				String fieldValue = null;
-				if (currentFieldName == null || dataLine.matches("^  [A-Z]{2,3}:.*")) {
-					currentFieldName = dataLine.replaceAll("^  ([A-Z]{2,3}):.*", "$1");
-					fieldValue = dataLine.replaceAll("^.*?:", "").trim();
-				} else {
-					fieldValue = dataLine.trim();
+				Map<String, List<String>> termFields = new HashMap<String, List<String>>();
+				String currentFieldName = null;
+				for (int i = 1; i < dataLines.length; i++) {
+					String dataLine = dataLines[i];
+					String fieldValue = null;
+					if (currentFieldName == null || dataLine.matches("^  [A-Z]{2,3}:.*")) {
+						currentFieldName = dataLine.replaceAll("^  ([A-Z]{2,3}):.*", "$1");
+						fieldValue = dataLine.replaceAll("^.*?:", "").trim();
+					} else {
+						fieldValue = dataLine.trim();
+					}
+
+					List<String> fieldValues = termFields.get(currentFieldName);
+					if (fieldValues == null) {
+						fieldValues = new ArrayList<String>();
+						termFields.put(currentFieldName, fieldValues);
+					}
+					fieldValues.add(fieldValue);
 				}
-
-				List<String> fieldValues = termFields.get(currentFieldName);
-				if (fieldValues == null) {
-					fieldValues = new ArrayList<String>();
-					termFields.put(currentFieldName, fieldValues);
-				}
-				fieldValues.add(fieldValue);
+				termData.put(term, termFields);
 			}
-			termData.put(term, termFields);
+
+			for (Term term : termData.keySet()) {
+				Map<String, List<String>> data = termData.get(term);
+				term.scopeNote = data.get("SN") != null ? data.get("SN").get(0) : null;
+				term.termNumber = Integer.parseInt(data.get("TNR").get(0));
+				term.use = data.get("USE") != null ? termsByName.get(data.get("USE").get(0)) : null;
+				if (data.get("UF") != null) {
+					for (String termName : data.get("UF")) {
+						term.usedFor.add(termsByName.get(termName));
+					}
+				}
+				if (data.get("BT") != null) {
+					for (String termName : data.get("BT")) {
+						term.broaderTerms.add(termsByName.get(termName));
+					}
+				}
+				if (data.get("NT") != null) {
+					for (String termName : data.get("NT")) {
+						term.narrowerTerms.add(termsByName.get(termName));
+					}
+				}
+				if (data.get("RT") != null) {
+					for (String termName : data.get("RT")) {
+						term.relatedTerms.add(termsByName.get(termName));
+					}
+				}
+			}
+
+			return new ScotUtil(termsByName);
+		} catch (Exception e) {
+			throw new RuntimeException("Error parsing Scot data - please check underlying data file is valid", e);
 		}
-
-		for (Term term : termData.keySet()) {
-			Map<String, List<String>> data = termData.get(term);
-			term.scopeNote = data.get("SN") != null ? data.get("SN").get(0) : null;
-			term.termNumber = Integer.parseInt(data.get("TNR").get(0));
-			term.use = data.get("USE") != null ? termsByName.get(data.get("USE").get(0)) : null;
-			if (data.get("UF") != null) {
-				for (String termName : data.get("UF")) {
-					term.usedFor.add(termsByName.get(termName));
-				}
-			}
-			if (data.get("BT") != null) {
-				for (String termName : data.get("BT")) {
-					term.broaderTerms.add(termsByName.get(termName));
-				}
-			}
-			if (data.get("NT") != null) {
-				for (String termName : data.get("NT")) {
-					term.narrowerTerms.add(termsByName.get(termName));
-				}
-			}
-			if (data.get("RT") != null) {
-				for (String termName : data.get("RT")) {
-					term.relatedTerms.add(termsByName.get(termName));
-				}
-			}
-		}
-
-		return new ScotUtil(termsByName);
 	}
 
 	public static class Term {
