@@ -5,7 +5,7 @@
     <artifactId>EdAuUtils</artifactId>
     <packaging>jar</packaging>
     <name>EdAuUtils</name>
-    <version>0.9.6</version>
+    <version>0.9.7</version>
     <url>http://code.google.com/p/educationau-utils/</url>
     <description>education.au Utilities</description>
 
