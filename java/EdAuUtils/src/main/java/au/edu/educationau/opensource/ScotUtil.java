@@ -121,30 +121,35 @@ public class ScotUtil {
 			throw new RuntimeException(e);
 		}
 		try {
+			// terms are delimited by double line break, this array will contain 1 term's data per element
 			String[] termDataStrings = scotData.split("\r\n\r\n|\r\r|\n\n");
 
 			Map<Term, Map<String, List<String>>> termData = new HashMap<Term, Map<String, List<String>>>();
 			Map<String, Term> termsByName = new HashMap<String, Term>();
 
 			for (String termDataString : termDataStrings) {
-				String[] dataLines = termDataString.split("\r\n|\r|\n");
+				String[] dataLines = termDataString.split("\r\n|\r|\n"); // each field value for a term is on a new line
 
 				Term term = new Term();
-				term.name = dataLines[0];
+				term.name = dataLines[0]; // name is always first
 				termsByName.put(term.name, term);
 
 				Map<String, List<String>> termFields = new HashMap<String, List<String>>();
+				
+				// some fields are repeatable, the field name occurs for the first value but is suppressed for the repeated lines/values -
+				// this loop will re-use the most recently seen field name if a line doesn't have a field name
 				String currentFieldName = null;
 				for (int i = 1; i < dataLines.length; i++) {
 					String dataLine = dataLines[i];
 					String fieldValue = null;
-					if (currentFieldName == null || dataLine.matches("^  [A-Z]{2,3}:.*")) {
-						currentFieldName = dataLine.replaceAll("^  ([A-Z]{2,3}):.*", "$1");
+					if (currentFieldName == null || dataLine.matches("^\\s*?[A-Z]{2,3}:.*")) {
+						currentFieldName = dataLine.replaceAll("^\\s*?([A-Z]{2,3}):.*", "$1");
 						fieldValue = dataLine.replaceAll("^.*?:", "").trim();
 					} else {
 						fieldValue = dataLine.trim();
 					}
 
+					// append the value to the current list of values (or a new list of none exists) for the current field name
 					List<String> fieldValues = termFields.get(currentFieldName);
 					if (fieldValues == null) {
 						fieldValues = new ArrayList<String>();
