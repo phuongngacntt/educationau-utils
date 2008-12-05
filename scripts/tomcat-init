@@ -54,7 +54,7 @@ RETVAL=0
 if [ -e $CATALINA_PID ]; then
 	CATALINA_PID_VALUE=`cat $CATALINA_PID`;
 else
-	CATALINA_PID_VALUE=`sudo netstat -vatpn|grep LISTEN|grep 9005|tr -s ' '|cut -f7 -d' '|cut -f1 -d'/'`
+	CATALINA_PID_VALUE=`sudo netstat -vatpn|grep LISTEN|grep $SHUTDOWN_PORTNUM |tr -s ' '|cut -f7 -d' '|cut -f1 -d'/'`
 fi
 
 # start, debug, stop, and status functions
