@@ -31,6 +31,9 @@ TOMCAT_PATH=
 # This can be found by looking in $TOMCAT_PATH/conf/server.xml
 SHUTDOWN_PORTNUM=
 
+# The time in seconds to wait for a clean shutdown before
+# killing the process
+SHUTDOWN_TIMEOUT=5
 
 #############################################################################################
 
@@ -46,6 +49,14 @@ export CATALINA_HOME=$TOMCAT_PATH
 
 RETVAL=0
 
+# Try to get the PID value from the PID file if it exists, or from netstat if it doesn't
+# Note that may fail, too (eg if tomcat isn't started)
+if [ -e $CATALINA_PID ]; then
+	CATALINA_PID_VALUE=`cat $CATALINA_PID`;
+else
+	CATALINA_PID_VALUE=`sudo netstat -vatpn|grep LISTEN|grep 9005|tr -s ' '|cut -f7 -d' '|cut -f1 -d'/'`
+fi
+
 # start, debug, stop, and status functions
 start() {
     # Start Tomcat in normal mode
@@ -60,7 +71,7 @@ start() {
         while [ $SHUTDOWN_PORT -eq 0 ]; do
             sleep 1
             SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
-        done	
+        done
         RETVAL=$?
         echo "Tomcat started in normal mode"
         [ $RETVAL=0 ] && touch /var/lock/subsys/$LOCK_NAME
@@ -80,7 +91,7 @@ debug() {
         while [ $SHUTDOWN_PORT -eq 0 ]; do
             sleep 1
             SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
-        done	
+        done
         RETVAL=$?
         echo "Tomcat started in debug mode"
         [ $RETVAL=0 ] && touch /var/lock/subsys/$LOCK_NAME
@@ -93,20 +104,21 @@ stop() {
         echo "Tomcat already stopped"
     else
         echo "Stopping tomcat..."
-        su $TOMCAT_USER -c "cd $TOMCAT_PATH/bin; $TOMCAT_PATH/bin/shutdown.sh"
-	SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
+        su $TOMCAT_USER -c "cd $TOMCAT_PATH/bin; $TOMCAT_PATH/bin/shutdown.sh &"
+	STILL_RUNNING=`ps -e | grep $CATALINA_PID_VALUE | grep java | wc -l`
 	LOOPCOUNT=0
-	MAXLOOPS=5
-        while [[ $SHUTDOWN_PORT -ne 0 && $LOOPCOUNT -lt $MAXLOOPS ]]; do
-            sleep 1
-            SHUTDOWN_PORT=`netstat -vatn|grep LISTEN|grep $SHUTDOWN_PORTNUM|wc -l`
-	    let LOOPCOUNT=$LOOPCOUNT+1
-        done
-	if [[ $LOOPCOUNT -ge $MAXLOOPS ]]
-	then
-	    echo 'Waited too long - killing tomcat process'
-	    kill -9 `cat $CATALINA_PID`
-	fi
+	MAXLOOPS=$SHUTDOWN_TIMEOUT
+        while [[ $STILL_RUNNING -ne 0 && $LOOPCOUNT -lt $MAXLOOPS ]]; do
+		echo 'Waiting..'
+		sleep 1
+		STILL_RUNNING=`ps -e | grep $CATALINA_PID_VALUE | grep java | wc -l`
+		let LOOPCOUNT=$LOOPCOUNT+1
+	done
+        if [[ $LOOPCOUNT -ge $MAXLOOPS ]]
+        then
+            echo 'Waited too long - killing tomcat process'
+            kill -9 $CATALINA_PID_VALUE
+        fi
 	RETVAL=$?
         echo "Tomcat stopped"
         [ $RETVAL=0 ] && rm -f /var/lock/subsys/$LOCK_NAME $TOMCAT_PATH/bin/tomcat.pid
