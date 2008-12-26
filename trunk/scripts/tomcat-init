@@ -1,4 +1,6 @@
-#! /bin/sh
+#! /bin/bash
+
+
 ### BEGIN INIT INFO
 #
 # chkconfig: 345 85 15
@@ -9,14 +11,20 @@
 
 ############################################################################################
 #
-# Tomcat init script for RedHat/CentOS. Only the start and stop commands have been tested.
+# Tomcat init script for RedHat/CentOS/Ubuntu 8.10. 
+#
+# Only the start and stop commands have been tested.
 #
 # To install:
 # 1) Rename it to something sensible (tomcat-<app-name> is usually good)
 # 2) Copy it into /etc/init.d and make it executable (chmod +x <scriptname>)
 # 3) Edit the configuation infomation below
-# 4) Add it to the runtime services using chkconfig: sudo /sbin/chkconfig --add <scriptname>
-# 5) Optionally edit the runlevels it will start at using /sbin/chkconfig command
+# Redhat/CentOS
+# 	4) Add it to the runtime services using chkconfig: sudo /sbin/chkconfig --add <scriptname>
+# 	5) Optionally edit the runlevels it will start at using /sbin/chkconfig command
+# Ubuntu (doesn't have chkconfig, but sysv-rc-conf works well.)
+#	4) Install sysv-rc-conf: sudo apt-get install sysv-rc-conf
+#	5) sudo sysv-rc-conf to install the script and edit the run levels
 #
 # THE FOLLOWING ITEMS MUST BE EDITIED FOR YOUR INSTALLATION
 #############################################################################################
@@ -33,7 +41,7 @@ SHUTDOWN_PORTNUM=
 
 # The time in seconds to wait for a clean shutdown before
 # killing the process
-SHUTDOWN_TIMEOUT=5
+SHUTDOWN_TIMEOUT=15
 
 #############################################################################################
 
@@ -55,6 +63,12 @@ if [ -e $CATALINA_PID ]; then
 	CATALINA_PID_VALUE=`cat $CATALINA_PID`;
 else
 	CATALINA_PID_VALUE=`sudo netstat -vatpn|grep LISTEN|grep $SHUTDOWN_PORTNUM |tr -s ' '|cut -f7 -d' '|cut -f1 -d'/'`
+fi
+
+# create /var/lock/subsys if it doesn't exist (eg, on Ubuntu)
+if [ ! -e /var/lock/subsys ]
+then
+    mkdir -p /var/lock/subsys
 fi
 
 # start, debug, stop, and status functions
