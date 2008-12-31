@@ -32,6 +32,75 @@ import au.edu.educationau.opensource.spring20.EnvironmentPropertyConfigurer;
  * <p>Note that the the web application will be loaded before the webserver ports are set. This means that code in the web application has a 
  * chance to set the relevent system properties. This enables the use of {@link EnvironmentPropertyConfigurer} for configuration.
  * 
+ * <p>The dependencies required to get this to work with JSP support are as follows:
+ * <pre>
+ 		<!-- Java APIs -->
+ 		<dependency>
+ 			<groupId>javax.servlet</groupId>
+ 			<artifactId>servlet-api</artifactId>
+ 			<version>2.5</version>
+ 			<scope>provided</scope>
+ 		</dependency>
+ 		<dependency>
+ 		  <groupId>javax.servlet.jsp</groupId>
+ 		  <artifactId>jsp-api</artifactId>
+ 		  <version>2.1</version>
+ 		  <scope>provided</scope>
+ 		</dependency>			
+ 
+		<!--  Jetty -->
+		<dependency>
+			<groupId>org.mortbay.jetty</groupId>
+			<artifactId>jetty</artifactId>
+			<version>6.1.5</version>
+ 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mortbay.jetty</groupId>
+			<artifactId>jetty-util</artifactId>
+			<version>6.1.5</version>
+			<scope>test</scope>
+		</dependency>
+  
+  		<!-- Tomcat dependencies (for JSP Support) -->
+ 		<dependency>
+ 		  <groupId>org.apache.tomcat</groupId>
+ 		  <artifactId>el-api</artifactId>
+ 		  <version>6.0.18</version>		 
+ 		</dependency>
+ 		<dependency>
+ 		  <groupId>org.apache.tomcat</groupId>
+ 		  <artifactId>jasper-el</artifactId>
+ 		  <version>6.0.18</version>		 
+ 		</dependency>
+ 		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>jasper</artifactId>
+			<version>6.0.13</version>
+			<scope>test</scope>
+		</dependency>		
+		<dependency>
+			<groupId>org.apache.tomcat</groupId>
+			<artifactId>jasper-jdt</artifactId>
+			<version>6.0.18</version>
+			<scope>test</scope>
+ 		</dependency>
+ 		<dependency>
+ 			<groupId>org.apache.tomcat</groupId>
+ 			<artifactId>juli</artifactId>
+ 			<version>6.0.18</version>
+ 		</dependency>	
+ * </pre>
+ * </p>
+ * <p>Many of these come from the tomcat release Maven repository:
+ * 
+ * <pre>
+		<repository> 
+			<id>tomcat-repo</id>
+			<url>http://tomcat.apache.org/dev/dist/m2-repository/org/apache/tomcat</url> 
+		</repository>
+ * </pre>
+ * </p>
  */
 public class TestWebServer {
 	public static void main(String[] args) throws Exception {
