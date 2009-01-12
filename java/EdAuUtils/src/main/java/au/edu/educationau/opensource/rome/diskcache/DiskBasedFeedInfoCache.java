@@ -30,7 +30,10 @@ public class DiskBasedFeedInfoCache implements FeedFetcherCache {
 		initCache();
 	}
 
-	private synchronized void initCacheLocked() {
+	/**
+	 * MUST be called ONLY when lock.writeLock().lock() has been called
+	 */
+	private void initCacheLocked() {
 		logger.info("Feed Info Cache path set to " + cachePath);
 		File f = new File(cachePath);
 		if (f.exists() && !f.isDirectory()) {
@@ -40,23 +43,33 @@ public class DiskBasedFeedInfoCache implements FeedFetcherCache {
 			throw new RuntimeException("Could not create directory " + cachePath);
 		}
 	}
-	
-	private synchronized void initCache() {
+
+	private void initCache() {
 		lock.writeLock().lock();
 		try {
-			initCacheLocked();			
+			initCacheLocked();
 		} finally {
 			lock.writeLock().unlock();
-		}		
+		}
 	}
 
 	public String getCachePath() {
-		return cachePath;
+		lock.readLock().lock();
+		try {
+			return cachePath;
+		} finally {
+			lock.readLock().unlock();
+		}
 	}
 
 	public void setCachePath(String cachePath) {
-		this.cachePath = cachePath;
-		initCache();
+		lock.writeLock().lock();
+		try {
+			this.cachePath = cachePath;
+			initCacheLocked();
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
 	protected String buildCachePath(URL url) {
@@ -123,9 +136,10 @@ public class DiskBasedFeedInfoCache implements FeedFetcherCache {
 	}
 
 	/**
-	 * NOTE: <b>This will lock the cache while it is in progress. It maybe quite slow!</b>
+	 * NOTE: <b>This will lock the cache while it is in progress. It maybe quite
+	 * slow!</b>
 	 */
-	public synchronized void clear() {
+	public void clear() {
 		logger.info("Clearing feed info cache in " + cachePath);
 		lock.writeLock().lock();
 		try {
@@ -133,17 +147,16 @@ public class DiskBasedFeedInfoCache implements FeedFetcherCache {
 			if (cacheDir.exists() && cacheDir.isDirectory()) {
 				deleteAllCacheFiles(cacheDir);
 			}
-			
-			initCacheLocked(); 			
+
+			initCacheLocked();
 		} finally {
 			lock.writeLock().unlock();
 		}
-		
-		
+
 	}
 
-	private void deleteAllCacheFiles(File cacheDir) {		
-		String[] filenames = cacheDir.list();		
+	private void deleteAllCacheFiles(File cacheDir) {
+		String[] filenames = cacheDir.list();
 		for (String name : filenames) {
 			File f = new File(cacheDir.getAbsolutePath() + File.separator + name);
 			if (f.isDirectory()) {
@@ -152,7 +165,7 @@ public class DiskBasedFeedInfoCache implements FeedFetcherCache {
 					if (!f.delete()) {
 						logger.warn("Could not delete directory " + f.getAbsolutePath());
 					}
-				}				
+				}
 			} else {
 				if (name.startsWith(FILE_PREFIX)) {
 					if (!f.delete()) {
@@ -161,23 +174,23 @@ public class DiskBasedFeedInfoCache implements FeedFetcherCache {
 				}
 			}
 		}
-		
+
 	}
 
 	public SyndFeedInfo remove(URL feedUrl) {
 		lock.readLock().lock();
-		try {		
+		try {
 			SyndFeedInfo result = getFeedInfo(feedUrl);
 			String fileName = buildCachePath(feedUrl);
-			
+
 			lock.readLock().unlock();
 			lock.writeLock().lock();
-			try {			
+			try {
 				File file = new File(fileName);
 				if (file.exists() && !file.delete()) {
 					throw new RuntimeException("Could not delete file " + fileName);
 				}
-		
+
 				return result;
 			} finally {
 				// downgrade to read lock
@@ -186,6 +199,6 @@ public class DiskBasedFeedInfoCache implements FeedFetcherCache {
 			}
 		} finally {
 			lock.readLock().unlock();
-		}			
+		}
 	}
 }

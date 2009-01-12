@@ -23,7 +23,7 @@ public class CacheUtilsTest extends TestCase {
 		
 		try {
 			input = null;		
-			result = CacheUtils.plainStringToMD5(input);
+			CacheUtils.plainStringToMD5(input);
 			fail("No exception was thrown for null input");
 		} catch (NullPointerException e) {
 			// should always be caught
