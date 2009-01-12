@@ -18,7 +18,7 @@ public class MaxSizedSetTest extends TestCase {
 		// because we always remove the "last" element, it looks better 
 		// if we run the loop backwards (with Integers we always remove the highest number)
 		for (int i = 20; i > 0; i--) {
-			set.add(new Integer(i));
+			set.add(Integer.valueOf(i));
 			assertTrue(set.size() <= size);
 			if (i <= size) {
 				assertEquals(size, set.size());
@@ -29,7 +29,7 @@ public class MaxSizedSetTest extends TestCase {
 	public void testAddAll() {
 		Collection<Integer> col = new ArrayList<Integer>();
 		for (int i = 0; i < 20; i++) {
-			col.add(new Integer(i));
+			col.add(Integer.valueOf(i));
 		}
 		
 		int size = 10;

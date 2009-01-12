@@ -21,13 +21,13 @@ import com.sun.syndication.fetcher.FetcherException;
 public class DiskFeedCache extends LinkedHashMapFeedCache {
 	Logger logger = Logger.getLogger(getClass().getName());
 
-	private transient String cachePath = null;
-	private transient long diskCacheHits;
-	private transient long memoryCacheHits;
-	private transient long cacheMisses;
-	private transient long cacheExpiries;
+	private volatile String cachePath = null;
+	private volatile long diskCacheHits;
+	private volatile long memoryCacheHits;
+	private volatile long cacheMisses;
+	private volatile long cacheExpiries;
 
-	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+	protected volatile ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
 	private Map<String, SoftReference<CacheInfo>> memCache = Collections.synchronizedMap(new HashMap<String, SoftReference<CacheInfo>>());
 
@@ -37,22 +37,30 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 
 	}
 
-	private synchronized void initCache() {
+	/**
+	 * MUST be called ONLY when lock.writeLock().lock() has been called
+	 */	
+	private void initCacheLocked() {
 		logger.info("Feed Cache path set to " + cachePath);
-		lock.writeLock().lock();
-		try {
-			File f = new File(cachePath);
-			if (f.exists() && !f.isDirectory()) {
-				throw new RuntimeException("Configured cache directory already exists as a file: " + cachePath);
-			}
+		File f = new File(cachePath);
+		if (f.exists() && !f.isDirectory()) {
+			throw new RuntimeException("Configured cache directory already exists as a file: " + cachePath);
+		}
 
-			if (!f.exists() && !f.mkdirs()) {
-				throw new RuntimeException("Could not create directory " + cachePath);
-			}
+		if (!f.exists() && !f.mkdirs()) {
+			throw new RuntimeException("Could not create directory " + cachePath);
+		}
+	}
+	
+	private void initCache() {
+		lock.writeLock().lock();
+		try {	
+			initCacheLocked();
 		} finally {
 			lock.writeLock().unlock();
 		}
 	}
+	
 
 	public long getMemoryCacheHits() {
 		return memoryCacheHits;
@@ -70,22 +78,32 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 		return cacheMisses;
 	}
 
-	public synchronized String getCachePath() {
-		return cachePath;
+	public String getCachePath() {
+		lock.readLock().lock();
+		try {			
+			return cachePath;
+		} finally {
+			lock.readLock().unlock();
+		}		
 	}
 
-	public synchronized void setCachePath(String cachePath) {
-		this.cachePath = cachePath;
-		initCache();
+	public void setCachePath(String cachePath) {
+		lock.writeLock().lock();
+		try {			
+			this.cachePath = cachePath;
+			initCacheLocked();
+		} finally {
+			lock.writeLock().unlock();
+		}			
 	}
 
-	public synchronized void resetCacheInfo() {
+	public void resetCacheInfo() {
 		diskCacheHits = 0;
 		cacheMisses = 0;
 		cacheExpiries = 0;
 	}
 
-	protected synchronized String buildCachePath(URL url) {
+	protected String buildCachePath(URL url) {
 		return CacheUtils.buildCachePath(url, cachePath, "_feed");		
 	}
 
@@ -257,30 +275,40 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 
 	@Override
 	public void setFeed(URL url, SyndFeed syndFeed) {
-		CacheInfo info = new CacheInfo(syndFeed);
-
-		addToMemCache(url, info);
-
-		String fileName = buildCachePath(url);
-		FileOutputStream fos = null;
+		lock.readLock().lock();
 		try {
-			fos = new FileOutputStream(fileName);
-			ObjectOutputStream oos = new ObjectOutputStream(fos);
-			oos.writeObject(info);
-			fos.flush();
-		} catch (Exception e) {
-			// Error writing to cache is fatal
-			logger.error("Error writing cache", e);
-			throw new RuntimeException("Attempting to write to cache", e);
-		} finally {
+			CacheInfo info = new CacheInfo(syndFeed);
+	
+			addToMemCache(url, info);
+	
+			String fileName = buildCachePath(url);
+			FileOutputStream fos = null;
+			lock.readLock().unlock();
+			lock.writeLock().lock();
 			try {
-				if (fos != null) {
-					fos.close();
+				fos = new FileOutputStream(fileName);
+				ObjectOutputStream oos = new ObjectOutputStream(fos);
+				oos.writeObject(info);
+				fos.flush();
+			} catch (Exception e) {
+				// Error writing to cache is fatal
+				logger.error("Error writing cache", e);
+				throw new RuntimeException("Attempting to write to cache", e);
+			} finally {
+				try {
+					if (fos != null) {
+						fos.close();
+					}
+				} catch (IOException e) {
+					logger.warn("error closing file", e);
 				}
-			} catch (IOException e) {
-				logger.warn("error closing file", e);
+				// downgrade the lock
+				lock.readLock().lock();
+				lock.writeLock().unlock();				
 			}
-		}
+		} finally {
+			lock.readLock().unlock();
+		}			
 	}
 
 }
