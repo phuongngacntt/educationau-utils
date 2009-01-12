@@ -7,6 +7,9 @@ import java.security.NoSuchAlgorithmException;
 
 public class CacheUtils {
 	public static String plainStringToMD5(String input) {
+		if (input == null) {
+			throw new NullPointerException("Input cannot be null");
+		}
 		MessageDigest md = null;
 		byte[] byteHash = null;
 		StringBuffer resultString = new StringBuffer();
