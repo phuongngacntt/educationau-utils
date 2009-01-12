@@ -70,11 +70,11 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 		return cacheMisses;
 	}
 
-	public String getCachePath() {
+	public synchronized String getCachePath() {
 		return cachePath;
 	}
 
-	public void setCachePath(String cachePath) {
+	public synchronized void setCachePath(String cachePath) {
 		this.cachePath = cachePath;
 		initCache();
 	}
@@ -85,8 +85,8 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 		cacheExpiries = 0;
 	}
 
-	protected String buildCachePath(URL url) {
-		return CacheUtils.buildCachePath(url, cachePath, "_feed");
+	protected synchronized String buildCachePath(URL url) {
+		return CacheUtils.buildCachePath(url, cachePath, "_feed");		
 	}
 
 	private CacheInfo getFromCache(URL url) throws IOException, ClassNotFoundException {
