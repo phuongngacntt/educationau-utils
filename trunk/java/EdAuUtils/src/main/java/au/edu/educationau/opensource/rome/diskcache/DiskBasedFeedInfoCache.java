@@ -21,7 +21,7 @@ public class DiskBasedFeedInfoCache implements FeedFetcherCache {
 
 	Logger logger = Logger.getLogger(getClass().getName());
 
-	private String cachePath = null;
+	private volatile String cachePath = null;
 
 	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
