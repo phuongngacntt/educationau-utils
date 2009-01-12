@@ -1,0 +1,14 @@
+<FindBugsFilter>
+     <Match>
+       <Class name="au.edu.*" />
+     </Match>
+
+     <Match>
+       <Bug code="DE,UrF,SIC" />
+     </Match>
+
+     <Match>
+       <Bug category="PERFORMANCE" />
+     </Match>
+
+</FindBugsFilter>
