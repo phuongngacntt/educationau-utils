@@ -8,8 +8,10 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.ref.SoftReference;
 import java.net.URL;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
@@ -18,43 +20,49 @@ import com.sun.syndication.fetcher.FetcherException;
 
 public class DiskFeedCache extends LinkedHashMapFeedCache {
 	Logger logger = Logger.getLogger(getClass().getName());
-	
-    private String cachePath = null;    
-    private long diskCacheHits;
-    private long memoryCacheHits;
-    private long cacheMisses;
-    private long cacheExpiries;
-    
-    private Map<String, SoftReference<CacheInfo>> memCache = new HashMap<String, SoftReference<CacheInfo>>();
 
-	public DiskFeedCache()  {
+	private transient String cachePath = null;
+	private transient long diskCacheHits;
+	private transient long memoryCacheHits;
+	private transient long cacheMisses;
+	private transient long cacheExpiries;
+
+	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+	private Map<String, SoftReference<CacheInfo>> memCache = Collections.synchronizedMap(new HashMap<String, SoftReference<CacheInfo>>());
+
+	public DiskFeedCache() {
 		cachePath = System.getProperty("java.io.tmpdir") + File.separator + "feedinfo" + File.separator;
 		initCache();
-        
-    }    
-    
-	private void initCache() {
-		logger.info("Feed Cache path set to " + cachePath);
-		File f = new File(cachePath);
-		if (f.exists() && !f.isDirectory()) {
-			throw new RuntimeException("Configured cache directory already exists as a file: " + cachePath);
-		}		
-		
-    	if (!f.exists() && !f.mkdirs()) {
-    		throw new RuntimeException("Could not create directory " + cachePath);
-    	}
+
 	}
-	
+
+	private synchronized void initCache() {
+		logger.info("Feed Cache path set to " + cachePath);
+		lock.writeLock().lock();
+		try {
+			File f = new File(cachePath);
+			if (f.exists() && !f.isDirectory()) {
+				throw new RuntimeException("Configured cache directory already exists as a file: " + cachePath);
+			}
+
+			if (!f.exists() && !f.mkdirs()) {
+				throw new RuntimeException("Could not create directory " + cachePath);
+			}
+		} finally {
+			lock.writeLock().unlock();
+		}
+	}
+
 	public long getMemoryCacheHits() {
 		return memoryCacheHits;
 	}
 
 	public long getCacheExpiries() {
 		return cacheExpiries;
-	}	
-	
-	
-    public long getDiskCacheHits() {
+	}
+
+	public long getDiskCacheHits() {
 		return diskCacheHits;
 	}
 
@@ -70,175 +78,209 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 		this.cachePath = cachePath;
 		initCache();
 	}
-	
+
 	public synchronized void resetCacheInfo() {
 		diskCacheHits = 0;
 		cacheMisses = 0;
 		cacheExpiries = 0;
 	}
-	
+
 	protected String buildCachePath(URL url) {
-    	return CacheUtils.buildCachePath(url, cachePath, "_feed");
-    }
-    
-	private CacheInfo getFromCache(URL url) throws IOException, ClassNotFoundException {
-		CacheInfo cacheInfo = getFromMemCache(url);
-		if (cacheInfo == null) {
-			String fileName =  buildCachePath(url);
-			File file = new File(fileName);
-			if (file.exists()) {
-				diskCacheHits++;				
-				FileInputStream fis = null;
-				try {
-    		        fis = new FileInputStream(file);
-    		        ObjectInputStream ois = new ObjectInputStream(fis);
-    		        cacheInfo = (CacheInfo)ois.readObject();					
-	    		} finally {
-	            	if (fis != null) {
-	            		try {
-	    					fis.close();
-	    				} catch (IOException e) {
-	    					logger.warn("error closing file", e);
-	    				}
-	            	}        	
-	            }
-			}
-		} else {
-			memoryCacheHits++;
-		}
-		
-		return cacheInfo;
+		return CacheUtils.buildCachePath(url, cachePath, "_feed");
 	}
-	
-    @Override
+
+	private CacheInfo getFromCache(URL url) throws IOException, ClassNotFoundException {
+		lock.readLock().lock();
+		try {
+			CacheInfo cacheInfo = getFromMemCache(url);
+			if (cacheInfo == null) {
+				String fileName = buildCachePath(url);
+				File file = new File(fileName);
+				if (file.exists()) {
+					diskCacheHits++;
+					FileInputStream fis = null;
+					try {
+						fis = new FileInputStream(file);
+						ObjectInputStream ois = new ObjectInputStream(fis);
+						cacheInfo = (CacheInfo) ois.readObject();
+					} finally {
+						if (fis != null) {
+							try {
+								fis.close();
+							} catch (IOException e) {
+								logger.warn("error closing file", e);
+							}
+						}
+					}
+				}
+			} else {
+				memoryCacheHits++;
+			}
+
+			return cacheInfo;
+		} finally {
+			lock.readLock().unlock();
+		}
+	}
+
+	@Override
 	public SyndFeed getFeed(URL url) throws FetcherException {
-    	try {
-	    	CacheInfo cacheInfo = getFromCache(url);
-	    	if (cacheInfo == null) {
-	    		cacheMisses++;
-	    		// not in cache yet
-	    		logger.info("cache miss: " + url.toExternalForm());
-	    		return null;    		
-	    	} else {
+		lock.readLock().lock();
+		try {
+			CacheInfo cacheInfo = getFromCache(url);
+			if (cacheInfo == null) {
+				cacheMisses++;
+				// not in cache yet
+				logger.info("cache miss: " + url.toExternalForm());
+				return null;
+			} else {
 				if (cacheHasExpired(cacheInfo)) {
 					// has expired
 					// remove old version
 					removeFromCache(url);
-	
+
 					logger.info("cache expired: " + url.toExternalForm());
-					cacheExpiries++;		
+					cacheExpiries++;
 					return null;
 				} else {
 					if (logger.isTraceEnabled()) {
 						logger.trace("cache not expired for " + url.toExternalForm());
 					}
-					
-					// not expired		
+
+					// not expired
 					addToMemCache(url, cacheInfo);
 					if (cacheInfo.isHasError()) {
-						logger.info(url.toExternalForm() + " has cached errors!");					
+						logger.info(url.toExternalForm() + " has cached errors!");
 						throw new FetcherException("cached " + cacheInfo.getErrorMessage());
-					}    					
+					}
 					return cacheInfo.getFeed();
-				}    		
-	    	}
-    	} catch (IOException e) {
-        	logger.error("Attempting to read from cache", e);
-        	throw new FetcherException("Attempting to read from cache", e);    		
-    	} catch (ClassNotFoundException e) {
-        	logger.error("Attempting to read from cache", e);
-        	throw new FetcherException("Attempting to read from cache", e);    		
+				}
+			}
+		} catch (IOException e) {
+			logger.error("Attempting to read from cache", e);
+			throw new FetcherException("Attempting to read from cache", e);
+		} catch (ClassNotFoundException e) {
+			logger.error("Attempting to read from cache", e);
+			throw new FetcherException("Attempting to read from cache", e);
+		} finally {
+			lock.readLock().unlock();
 		}
 	}
-    
-    private void addToMemCache(URL url, CacheInfo cacheInfo) {
-    	memCache.put(url.toExternalForm(), new SoftReference<CacheInfo>(cacheInfo));
-    }
 
-    private CacheInfo getFromMemCache(URL url) {
-    	SoftReference<CacheInfo> sr = memCache.get(url.toExternalForm());
-    	if (sr != null) {
-    		CacheInfo info = sr.get(); // may return null if has been collected
-    		if (info == null) {
-    			memCache.remove(url.toExternalForm());
-    		} 
-    		return info;
-    	} else {
-    		return null;
-    	}
-    }
-    
-	private void removeFromCache(URL url) {
-		String fileName =  buildCachePath(url);
-		File file = new File(fileName);
-		if (file.exists() && !file.delete()) {
-			throw new RuntimeException("Could not delete file " + fileName);			
+	private void addToMemCache(URL url, CacheInfo cacheInfo) {
+		// this does not need to use the lock, because memCache is synchronized
+		memCache.put(url.toExternalForm(), new SoftReference<CacheInfo>(cacheInfo));
+	}
+
+	private CacheInfo getFromMemCache(URL url) {
+		// this does not need to use the lock, because memCache is synchronized
+		SoftReference<CacheInfo> sr = memCache.get(url.toExternalForm());
+		if (sr != null) {
+			CacheInfo info = sr.get(); // may return null if has been collected
+			if (info == null) {
+				memCache.remove(url.toExternalForm());
+			}
+			return info;
+		} else {
+			return null;
 		}
-		// remove from memory cache
-		memCache.remove(url.toExternalForm());
+	}
+
+	private void removeFromCache(URL url) {
+		lock.readLock().lock();
+		try {
+			String fileName = buildCachePath(url);
+			File file = new File(fileName);
+			lock.readLock().unlock();
+			lock.writeLock().lock();
+			try {
+				if (file.exists() && !file.delete()) {
+					throw new RuntimeException("Could not delete file " + fileName);
+				}
+				// remove from memory cache
+				memCache.remove(url.toExternalForm());
+			} finally {
+				// downgrade the lock
+				lock.readLock().lock();
+				lock.writeLock().unlock();				
+			}
+		} finally {
+			lock.readLock().unlock();
+		}			
 	}
 
 	@Override
 	public void setFeedError(URL url, String error) {
+		lock.readLock().lock();
 		try {
-			logger.info("Caching error for " + url.toExternalForm() + " (Error msg is " + error + ")");		
+			logger.info("Caching error for " + url.toExternalForm() + " (Error msg is " + error + ")");
 			CacheInfo cacheInfo = getFromCache(url);
 			if (cacheInfo == null) {
-				// not already in cache
-				CacheInfo info = new CacheInfo(error);
-				addToMemCache(url, info);
+				lock.readLock().unlock();
+				lock.writeLock().lock();
+				try {
 				
-				String fileName =  buildCachePath(url);
-		        FileOutputStream fos = null;
-		        try {
-		            fos = new FileOutputStream(fileName);
-		            ObjectOutputStream oos = new ObjectOutputStream(fos);
-		            oos.writeObject(info);
-		            fos.flush();        
-		        } finally {
-		        	try {
-		        		if (fos != null) {
-		        			fos.close();
-		        		}				
-					} catch (IOException e) {
-						logger.warn("error closing file", e);
+					// not already in cache
+					CacheInfo info = new CacheInfo(error);
+					addToMemCache(url, info);
+	
+					String fileName = buildCachePath(url);
+					FileOutputStream fos = null;
+					try {
+						fos = new FileOutputStream(fileName);
+						ObjectOutputStream oos = new ObjectOutputStream(fos);
+						oos.writeObject(info);
+						fos.flush();
+					} finally {
+						try {
+							if (fos != null) {
+								fos.close();
+							}
+						} catch (IOException e) {
+							logger.warn("error closing file", e);
+						}
 					}
-		        }						
+				} finally {
+					// downgrade the lock
+					lock.readLock().lock();
+					lock.writeLock().unlock();					
+				}
 			} else {
 				logger.info("Error for " + url.toExternalForm() + " already cached");
 			}
 		} catch (Exception e) {
 			logger.error("Error writing to cache for " + url.toExternalForm(), e);
-		}
+		} finally {
+			lock.readLock().unlock();
+		}	
 	}
-	
-	
+
 	@Override
 	public void setFeed(URL url, SyndFeed syndFeed) {
 		CacheInfo info = new CacheInfo(syndFeed);
-		
+
 		addToMemCache(url, info);
-		
-		String fileName =  buildCachePath(url);
-        FileOutputStream fos = null;
-        try {
-            fos = new FileOutputStream(fileName);
-            ObjectOutputStream oos = new ObjectOutputStream(fos);
-            oos.writeObject(info);
-            fos.flush();        
-        } catch (Exception e) {
-            // Error writing to cache is fatal
-        	logger.error("Error writing cache", e);
-            throw new RuntimeException("Attempting to write to cache", e);
-        } finally {
-        	try {
-        		if (fos != null) {
-        			fos.close();
-        		}				
+
+		String fileName = buildCachePath(url);
+		FileOutputStream fos = null;
+		try {
+			fos = new FileOutputStream(fileName);
+			ObjectOutputStream oos = new ObjectOutputStream(fos);
+			oos.writeObject(info);
+			fos.flush();
+		} catch (Exception e) {
+			// Error writing to cache is fatal
+			logger.error("Error writing cache", e);
+			throw new RuntimeException("Attempting to write to cache", e);
+		} finally {
+			try {
+				if (fos != null) {
+					fos.close();
+				}
 			} catch (IOException e) {
 				logger.warn("error closing file", e);
 			}
-        }
+		}
 	}
 
 }
