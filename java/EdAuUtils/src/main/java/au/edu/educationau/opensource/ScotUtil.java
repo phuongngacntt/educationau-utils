@@ -112,7 +112,6 @@ public class ScotUtil {
 	/**
 	 * Creates an instance from the given input stream. Takes < 1 second of CPU on a 2.4Ghz P4.
 	 */
-	@SuppressWarnings("unchecked")
 	public static ScotUtil create(InputStream scotFileDataInputStream) {
 		String scotData = null;
 		try {
