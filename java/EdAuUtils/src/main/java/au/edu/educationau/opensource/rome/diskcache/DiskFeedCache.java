@@ -142,8 +142,7 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 	}
 
 	@Override
-	public SyndFeed getFeed(URL url) throws FetcherException {
-		lock.readLock().lock();
+	public SyndFeed getFeed(URL url) throws FetcherException {		
 		try {
 			CacheInfo cacheInfo = getFromCache(url);
 			if (cacheInfo == null) {
@@ -180,9 +179,7 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 		} catch (ClassNotFoundException e) {
 			logger.error("Attempting to read from cache", e);
 			throw new FetcherException("Attempting to read from cache", e);
-		} finally {
-			lock.readLock().unlock();
-		}
+		} 
 	}
 
 	private void addToMemCache(URL url, CacheInfo cacheInfo) {
@@ -228,13 +225,11 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 	}
 
 	@Override
-	public void setFeedError(URL url, String error) {
-		lock.readLock().lock();
+	public void setFeedError(URL url, String error) {		
 		try {
 			logger.info("Caching error for " + url.toExternalForm() + " (Error msg is " + error + ")");
 			CacheInfo cacheInfo = getFromCache(url);
-			if (cacheInfo == null) {
-				lock.readLock().unlock();
+			if (cacheInfo == null) {				
 				lock.writeLock().lock();
 				try {
 				
@@ -259,8 +254,6 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 						}
 					}
 				} finally {
-					// downgrade the lock
-					lock.readLock().lock();
 					lock.writeLock().unlock();					
 				}
 			} else {
@@ -268,8 +261,6 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 			}
 		} catch (Exception e) {
 			logger.error("Error writing to cache for " + url.toExternalForm(), e);
-		} finally {
-			lock.readLock().unlock();
 		}	
 	}
 
@@ -302,7 +293,7 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 				} catch (IOException e) {
 					logger.warn("error closing file", e);
 				}
-				// downgrade the lock
+				// downgrade the lock				
 				lock.readLock().lock();
 				lock.writeLock().unlock();				
 			}
