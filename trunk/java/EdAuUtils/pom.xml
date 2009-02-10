@@ -14,19 +14,20 @@
 		<connection>scm:svn:http://educationau-utils.googlecode.com/svn/trunk/java/EdAuUtils/</connection>
 	</scm>
 	
+
 	<distributionManagement>
 		<repository>
 			<id>maven.educationau.edu.au-releases</id>
-			<name>maven.educationau.edu.au-releases</name>
+            <name>maven.educationau.edu.au-releases</name>
 			<url>http://maven.educationau.edu.au:80/EdAuUtil</url>
 		</repository>
 		<snapshotRepository>
 			<id>maven.educationau.edu.au-snapshots</id>
-			<name>maven.educationau.edu.au-snapshots</name>
+            <name>maven.educationau.edu.au-snapshots</name>
 			<url>http://maven.educationau.edu.au:80/EdAuUtil</url>
 		</snapshotRepository>
 	</distributionManagement>
-	
+
 	<build>
 		<defaultGoal>install</defaultGoal>
 		<resources>
