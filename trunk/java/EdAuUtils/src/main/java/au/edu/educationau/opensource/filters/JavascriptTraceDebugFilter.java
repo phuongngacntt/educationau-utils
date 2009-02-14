@@ -45,9 +45,12 @@ import org.apache.log4j.Logger;
  *	</filter>
  *
  * <!-- Make sure this goes after any gzip filters (so it runs first before being gzipped) -->
- * 	<filter-mapping>
+ *	<filter-mapping>
  *		<filter-name>JavascriptTraceDebugFilter</filter-name>
  *		<url-pattern>*.js</url-pattern>
+ *		<dispatcher>REQUEST</dispatcher>
+ *		<dispatcher>FORWARD</dispatcher>
+ *		<dispatcher>INCLUDE</dispatcher>
  *	</filter-mapping>
  */
 public class JavascriptTraceDebugFilter implements Filter {
@@ -145,8 +148,7 @@ public class JavascriptTraceDebugFilter implements Filter {
 				b.append(line + "\r\n");
 			}
 
-			response.getWriter().write(b.toString());
-			response.flushBuffer();
+			response.getOutputStream().write(b.toString().getBytes());
 		} else {
 			chain.doFilter(request, response);
 		}
