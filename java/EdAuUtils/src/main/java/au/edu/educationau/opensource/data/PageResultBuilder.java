@@ -16,9 +16,6 @@ import org.hibernate.Session;
 import org.springframework.orm.hibernate3.HibernateCallback;
 import org.springframework.orm.hibernate3.HibernateTemplate;
 
-import au.edu.educationau.opensource.data.PageResult;
-import au.edu.educationau.opensource.data.PageSettings;
-
 /**
  * 
  * An easy way of creating PageResult-type queries. Note that the SQL from these are probably not as optimized as a hand written version
