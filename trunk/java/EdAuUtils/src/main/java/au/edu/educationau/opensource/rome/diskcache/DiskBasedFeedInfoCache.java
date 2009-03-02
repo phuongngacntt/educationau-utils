@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InvalidClassException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.URL;
@@ -80,27 +81,45 @@ public class DiskBasedFeedInfoCache implements FeedFetcherCache {
 		lock.readLock().lock();
 		try {
 			SyndFeedInfo info = null;
-			String fileName = buildCachePath(url);
-			FileInputStream fis;
-			try {
-				fis = new FileInputStream(fileName);
-				ObjectInputStream ois = new ObjectInputStream(fis);
-				info = (SyndFeedInfo) ois.readObject();
-				fis.close();
-			} catch (FileNotFoundException fnfe) {
+			String fileName = buildCachePath(url);	
+			File file = new File(fileName);
+			if (file.exists()) {
+				FileInputStream fis = null;
+				boolean deleteFile = false;
+				try {
+					fis = new FileInputStream(fileName);				
+					ObjectInputStream ois = new ObjectInputStream(fis);
+					info = (SyndFeedInfo) ois.readObject();					
+				} catch (InvalidClassException ice) {
+					// this often happens if the serialized class has changed - eg, after an upgrade
+					logger.warn("Invalid class reading from cache - cached item will be ignored");
+					deleteFile = true;					
+				} catch (Exception e) {
+					// Error writing to cache is fatal
+					logger.error("Attempting to read from cache", e);
+					throw new RuntimeException("Attempting to read from cache", e);
+				} finally {
+					if (fis != null) {
+						try {
+							fis.close();
+						} catch (IOException e) {
+							logger.warn("error closing file", e);
+						}
+					}					
+				}
+					
+				if (deleteFile) {
+					file.delete();
+				} 
+				
+				if (info == null) {
+					logger.info("Cache miss for url " + url.toExternalForm());
+				}
+				
+			} else {
 				logger.debug("Cache miss for " + url.toString());
-			} catch (ClassNotFoundException cnfe) {
-				// Error writing to cache is fatal
-				logger.error("Attempting to read from cache", cnfe);
-				throw new RuntimeException("Attempting to read from cache", cnfe);
-			} catch (IOException fnfe) {
-				// Error writing to cache is fatal
-				logger.error("Attempting to read from cache", fnfe);
-				throw new RuntimeException("Attempting to read from cache", fnfe);
 			}
-			if (info == null) {
-				logger.info("Cache miss for url " + url.toExternalForm());
-			}
+			
 			return info;
 		} finally {
 			lock.readLock().unlock();

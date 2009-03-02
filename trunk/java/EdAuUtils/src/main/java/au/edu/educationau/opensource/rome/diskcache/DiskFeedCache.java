@@ -116,11 +116,18 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 				File file = new File(fileName);
 				if (file.exists()) {
 					diskCacheHits++;
+					boolean deleteFile = false;
 					FileInputStream fis = null;
 					try {
 						fis = new FileInputStream(file);
 						ObjectInputStream ois = new ObjectInputStream(fis);
-						cacheInfo = (CacheInfo) ois.readObject();
+						try {
+							cacheInfo = (CacheInfo) ois.readObject();
+						} catch (java.io.InvalidClassException e) {
+							// this often happens if the serialized class has changed - eg, after an upgrade
+							logger.warn("Invalid class reading from cache - cached item will be ignored");
+							deleteFile = true;
+						}
 					} finally {
 						if (fis != null) {
 							try {
@@ -129,6 +136,10 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 								logger.warn("error closing file", e);
 							}
 						}
+					}
+					
+					if (deleteFile) {
+						file.delete();
 					}
 				}
 			} else {
