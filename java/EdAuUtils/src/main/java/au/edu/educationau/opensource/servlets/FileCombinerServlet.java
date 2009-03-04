@@ -16,14 +16,52 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
 
+/**
+ * Use linking to a resource somehow like
+ * 
+ * <p>
+ * /static/cacheable/css/<%= ControllerUtils.cacheControlfile(request, "/styles/reset.css") %>,<%= ControllerUtils.cacheControlfile(request,
+ * "/styles/global.css") %>
+ * 
+ * <p>
+ * then in web.xml
+ * 
+ * <p>
+ * <servlet-mapping> <servlet-name>FileCombiner</servlet-name> <url-pattern>/combine/*</url-pattern> </servlet-mapping>
+ * 
+ * <p>
+ * then in urlrewrite.xml
+ * 
+ * <p>
+ * <rule> <from>^/static/cacheable/css/(.+)$</from> <to>/combine/?cachethis=1&amp;filenames=$1&amp;contenttype=text/css</to> </rule>
+ * 
+ * <p>
+ * <rule> <from>^/static/cacheable/js/(.+)$</from> <to>/combine/?cachethis=1&amp;filenames=$1&amp;contenttype=text/javascript</to> </rule>
+ * 
+ * <p>
+ * if you have styles resources under a nested path (eg /something/styles/doot.css), use a / to delimit the parent dirs and then ~ after that
+ * 
+ * <p>
+ * eg
+ * 
+ * <p>
+ * <%= ControllerUtils.cacheControlfile(request, "/themes~styles~branded_global.css") %>
+ * 
+ * @author nlothian
+ * @author bsmyth
+ */
 public class FileCombinerServlet extends HttpServlet {
 
+	private static final String LAST_MODIFIED_HEADER = "Last-modified";
+
 	private static final long serialVersionUID = -2818467139725459646L;
-	
+
 	private static final String BAD_BROWSERS_REGEX = ".*MSIE 6\\..*";
-	
+
+	private static final String HEADER_IF_MODIFIED_SINCE = "If-Modified-Since";
+
 	private Pattern pattern = Pattern.compile(BAD_BROWSERS_REGEX);
-	
+
 	private Pattern timestampedUrlPattern = Pattern.compile("^/stmp/(.+)/(.+)/(.+)$");
 
 	private String cacheUntil;
@@ -31,62 +69,131 @@ public class FileCombinerServlet extends HttpServlet {
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
-		
+
 		this.cacheUntil = config.getInitParameter("cache-until");
 	}
-	
-	
+
 	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
 		if (request.getParameter("contenttype") != null) {
 			response.setContentType(request.getParameter("contenttype"));
 		}
-				
-		HttpServletResponse theResponse = response;
-		// check if the browser claims to accept gzipped content
-		String ae = request.getHeader("accept-encoding");
-		String ua = request.getHeader("User-Agent");
-	    if (ua != null && ae != null && ae.indexOf("gzip") != -1) {
-	    	// now make sure it isn't IE 6.x (which doesn't work properly with compressed javascript, (technically SP2 does, but too bad))
-	    	Matcher matcher = pattern.matcher(ua);
-	    	if (!matcher.find()) {
-	    		theResponse =  new GZIPResponseWrapper(response);
-	    	} 
-	    }
-	    
-	    boolean useFarFutureCacheExpiry = (request.getParameter("cachethis") != null);
-	    if (useFarFutureCacheExpiry && (cacheUntil != null)) {
-	    	response.addHeader("Expires", cacheUntil);
-	    }
-	    
+
+
+
 		String filenames = request.getParameter("filenames");
-		if (filenames != null) {
-			String[] filenameArray = filenames.split(",");
-			for (String name : filenameArray) {
-				if (!name.startsWith("/")) {
-					name = "/" + name;
-				}					
-				
-				Matcher matcher = timestampedUrlPattern.matcher(name);
-				if (matcher.matches()) {
-					name = "/" + matcher.group(2) + "/" + matcher.group(3);
-				}				
-											
-				RequestDispatcher rd = getServletContext().getRequestDispatcher(name);
-				if (rd != null) {
-					rd.include(request, theResponse);					
-					theResponse.getOutputStream().println("\n");					
-				} else {
-					getServletContext().log(this.getClass().getName() +  ": Error: Could not find resource " + name);
-				}
-			}
+
+		Long maxLastModified = getMaximumModifiedDate(filenames.split(","));
+		if (maxLastModified != null) {
+			// header isn't provided in milliseconds so deal with that
+			maxLastModified = maxLastModified / 1000 * 1000;
 		}
 		
-		if (theResponse instanceof GZIPResponseWrapper) {
-			((GZIPResponseWrapper)theResponse).finishResponse();
+		Long requestedLastModified = request.getDateHeader(HEADER_IF_MODIFIED_SINCE);
+				
+		if (requestedLastModified == -1 || maxLastModified > requestedLastModified) {
+			
+			// cache has old version, so we will combine and compress
+			
+			HttpServletResponse theResponse = response;
+			// check if the browser claims to accept gzipped content
+			String ae = request.getHeader("accept-encoding");
+			String ua = request.getHeader("User-Agent");
+			if (ua != null && ae != null && ae.indexOf("gzip") != -1) {
+				// now make sure it isn't IE 6.x (which doesn't work properly with compressed javascript, (technically SP2 does, but too bad))
+				Matcher matcher = pattern.matcher(ua);
+				if (!matcher.find()) {
+					theResponse = new GZIPResponseWrapper(response);
+				}
+			}
+			
+			boolean useFarFutureCacheExpiry = (request.getParameter("cachethis") != null);
+			if (useFarFutureCacheExpiry && (cacheUntil != null)) {
+				response.addHeader("Expires", cacheUntil);
+			}
+
+			if (filenames != null) {
+
+				String[] filenameArray = filenames.split(",");
+
+				for (String name : filenameArray) {
+					if (!name.startsWith("/")) {
+						name = "/" + name;
+					}
+					
+					Matcher matcher = timestampedUrlPattern.matcher(name);
+					if (matcher.matches()) {
+						name = "/" + matcher.group(2) + "/" + matcher.group(3);
+					}	
+
+					// delimit dirs under the parent
+					name = name.replace('~', '/');
+
+					RequestDispatcher rd = getServletContext().getRequestDispatcher(name);
+					if (rd != null) {
+						rd.include(request, theResponse);
+						theResponse.getOutputStream().println("\n");
+					} else {
+						getServletContext().log(this.getClass().getName() + ": Error: Could not find resource " + name);
+					}
+				}
+			}
+
+			if (maxLastModified != null) {
+				theResponse.setDateHeader(LAST_MODIFIED_HEADER, maxLastModified);
+			}
+
+			if (theResponse instanceof GZIPResponseWrapper) {
+				((GZIPResponseWrapper) theResponse).finishResponse();
+			}
+
+		} else {
+			
+			// cache has current version
+			response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+			
 		}
-	} 
+	}
 	
+	private Long getModifiedDate(String filename) {
+
+		Long lastModified = null;
+
+		if (!filename.startsWith("/")) {
+			filename = "/" + filename;
+		}
+
+		Matcher matcher = timestampedUrlPattern.matcher(filename);
+		if (matcher.matches()) {
+			try {
+				lastModified = Long.parseLong(matcher.group(1).replace("/", ""));
+			} catch (Exception e) {
+				// swallow
+			}
+		}
+
+		return lastModified;
+
+	}
+
+	private Long getMaximumModifiedDate(String[] filenames) {
+
+		Long maxLastModified = null;
+
+		for (String name : filenames) {
+
+			Long currentLastModified = getModifiedDate(name);
+
+			if (maxLastModified == null || currentLastModified > maxLastModified) {
+				maxLastModified = currentLastModified;
+			}
+
+		}
+
+		return maxLastModified;
+	}
+
 	class GZIPResponseWrapper extends HttpServletResponseWrapper {
 		protected HttpServletResponse origResponse = null;
 
@@ -145,7 +252,7 @@ public class FileCombinerServlet extends HttpServlet {
 		public void setContentLength(int length) {
 		}
 	}
-	
+
 	class GZIPResponseStream extends ServletOutputStream {
 		protected ByteArrayOutputStream baos = null;
 
@@ -210,9 +317,8 @@ public class FileCombinerServlet extends HttpServlet {
 		}
 
 		public void reset() {
-			//noop
+			// noop
 		}
 	}
-	
 
 }
