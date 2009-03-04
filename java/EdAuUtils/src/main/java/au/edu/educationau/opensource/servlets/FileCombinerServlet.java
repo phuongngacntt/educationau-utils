@@ -80,8 +80,6 @@ public class FileCombinerServlet extends HttpServlet {
 			response.setContentType(request.getParameter("contenttype"));
 		}
 
-
-
 		String filenames = request.getParameter("filenames");
 
 		Long maxLastModified = getMaximumModifiedDate(filenames.split(","));
@@ -90,7 +88,7 @@ public class FileCombinerServlet extends HttpServlet {
 			maxLastModified = maxLastModified / 1000 * 1000;
 		}
 		
-		Long requestedLastModified = request.getDateHeader(HEADER_IF_MODIFIED_SINCE);
+		long requestedLastModified = request.getDateHeader(HEADER_IF_MODIFIED_SINCE);
 				
 		if (requestedLastModified == -1 || maxLastModified > requestedLastModified) {
 			
