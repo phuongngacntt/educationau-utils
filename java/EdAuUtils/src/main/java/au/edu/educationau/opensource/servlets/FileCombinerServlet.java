@@ -62,7 +62,7 @@ public class FileCombinerServlet extends HttpServlet {
 
 	private Pattern pattern = Pattern.compile(BAD_BROWSERS_REGEX);
 
-	private Pattern timestampedUrlPattern = Pattern.compile("^/stmp/(.+)/(.+)/(.+)$");
+	private Pattern timestampedUrlPattern = Pattern.compile("^/stmp/(.+?)/(.*)");
 
 	private String cacheUntil;
 
@@ -120,13 +120,12 @@ public class FileCombinerServlet extends HttpServlet {
 						name = "/" + name;
 					}
 					
+					name = name.replaceAll("~", "/"); // TODO: remove when ~ isn't used for path component delimeter by anything anymore
+					
 					Matcher matcher = timestampedUrlPattern.matcher(name);
 					if (matcher.matches()) {
-						name = "/" + matcher.group(2) + "/" + matcher.group(3);
+						name = matcher.group(2);
 					}	
-
-					// delimit dirs under the parent
-					name = name.replace('~', '/');
 
 					RequestDispatcher rd = getServletContext().getRequestDispatcher(name);
 					if (rd != null) {
