@@ -111,22 +111,23 @@ public class FileCombinerServlet extends HttpServlet {
 				response.addHeader("Expires", cacheUntil);
 			}
 
-			if (filenames != null) {
-
+			if (filenames != null) {				
 				String[] filenameArray = filenames.split(",");
-
+				
 				for (String name : filenameArray) {
 					if (!name.startsWith("/")) {
 						name = "/" + name;
-					}
-					
+					}					
 					name = name.replaceAll("~", "/"); // TODO: remove when ~ isn't used for path component delimeter by anything anymore
 					
 					Matcher matcher = timestampedUrlPattern.matcher(name);
 					if (matcher.matches()) {
 						name = matcher.group(2);
 					}	
-
+					
+					if (!name.startsWith("/")) {
+						name = "/" + name;
+					}
 					RequestDispatcher rd = getServletContext().getRequestDispatcher(name);
 					if (rd != null) {
 						rd.include(request, theResponse);
