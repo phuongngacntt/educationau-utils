@@ -130,8 +130,13 @@ public class FileCombinerServlet extends HttpServlet {
 					}
 					RequestDispatcher rd = getServletContext().getRequestDispatcher(name);
 					if (rd != null) {
-						rd.include(request, theResponse);
-						theResponse.getOutputStream().println("\n");
+						rd.include(request, theResponse);	
+						try {
+							theResponse.getOutputStream().println("\n");
+						} catch (IllegalStateException e) {
+							// getWriter() has already been called
+							theResponse.getWriter().println("\n");
+						}
 					} else {
 						getServletContext().log(this.getClass().getName() + ": Error: Could not find resource " + name);
 					}
