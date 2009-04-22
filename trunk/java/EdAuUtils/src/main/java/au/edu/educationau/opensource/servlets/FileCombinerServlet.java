@@ -105,12 +105,13 @@ public class FileCombinerServlet extends HttpServlet {
 					theResponse = new GZIPResponseWrapper(response);
 				}
 			}
-			
+
 			boolean useFarFutureCacheExpiry = (request.getParameter("cachethis") != null);
 			if (useFarFutureCacheExpiry && (cacheUntil != null)) {
-				response.addHeader("Expires", cacheUntil);
-			}
-
+				theResponse.addHeader("Expires", cacheUntil);
+				theResponse.addHeader("Cache-Control", "public");
+			}			
+			
 			if (filenames != null) {				
 				String[] filenameArray = filenames.split(",");
 				
