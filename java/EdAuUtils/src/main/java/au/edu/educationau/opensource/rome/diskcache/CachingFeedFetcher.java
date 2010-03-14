@@ -8,10 +8,10 @@ import org.apache.log4j.Logger;
 import com.sun.syndication.feed.synd.SyndFeed;
 import com.sun.syndication.fetcher.FetcherException;
 import com.sun.syndication.fetcher.impl.FeedFetcherCache;
-import com.sun.syndication.fetcher.impl.HttpURLFeedFetcher;
+import com.sun.syndication.fetcher.impl.HttpClientFeedFetcher;
 import com.sun.syndication.io.FeedException;
 
-public class CachingFeedFetcher extends HttpURLFeedFetcher {
+public class CachingFeedFetcher extends HttpClientFeedFetcher {
 	static final Logger logger = Logger.getLogger(CachingFeedFetcher.class);
 	
 	private FeedCache feedCache;
