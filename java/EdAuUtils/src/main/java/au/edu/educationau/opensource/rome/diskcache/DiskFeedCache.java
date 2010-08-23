@@ -127,6 +127,10 @@ public class DiskFeedCache extends LinkedHashMapFeedCache {
 							// this often happens if the serialized class has changed - eg, after an upgrade
 							logger.warn("Invalid class reading from cache - cached item will be ignored");
 							deleteFile = true;
+						} catch (java.io.EOFException e) {
+							// this may happen if the file cached becomes corrupt
+							logger.warn("EOF Exception caught fetching feed from cache, possible corruption, deleting file");
+							deleteFile = true;
 						}
 					} finally {
 						if (fis != null) {
