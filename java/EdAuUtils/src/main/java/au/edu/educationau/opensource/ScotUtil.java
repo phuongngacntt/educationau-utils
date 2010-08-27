@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
+import org.jdom.Document;
+import org.jdom.Element;
+import org.jdom.input.SAXBuilder;
+import org.jdom.xpath.XPath;
 
 /**
  * Wrapper around a Scot file (or the file contents from some other input stream) giving basic search functionality. When an instance of this class is created
@@ -30,6 +34,7 @@ public class ScotUtil {
 
 	private List<Term> terms;
 
+	
 	@SuppressWarnings("unchecked")
 	private ScotUtil(Map<String, Term> termsByName) {
 		this.termsByName = termsByName;
@@ -93,6 +98,8 @@ public class ScotUtil {
 		return termsByNumber.get(termNumber);
 	}
 
+	
+	
 	/**
 	 * Creates an instance from the file specified by the given filePath.
 	 */
@@ -141,8 +148,8 @@ public class ScotUtil {
 				for (int i = 1; i < dataLines.length; i++) {
 					String dataLine = dataLines[i];
 					String fieldValue = null;
-					if (currentFieldName == null || dataLine.matches("^\\s*?[A-Z]{2,3}:.*")) {
-						currentFieldName = dataLine.replaceAll("^\\s*?([A-Z]{2,3}):.*", "$1");
+					if (currentFieldName == null || dataLine.matches("^\\s*?[A-Z]{2,4}:.*")) {
+						currentFieldName = dataLine.replaceAll("^\\s*?([A-Z]{2,4}):.*", "$1");
 						fieldValue = dataLine.replaceAll("^.*?:", "").trim();
 					} else {
 						fieldValue = dataLine.trim();
@@ -163,7 +170,11 @@ public class ScotUtil {
 				Map<String, List<String>> data = termData.get(term);
 				term.scopeNote = data.get("SN") != null ? data.get("SN").get(0) : null;
 				term.termNumber = Integer.parseInt(data.get("TNR").get(0));
-				term.use = data.get("USE") != null ? termsByName.get(data.get("USE").get(0)) : null;
+				if (data.get("USE") != null) {
+					for (String termName : data.get("USE")) {
+						term.use.add(termsByName.get(termName));
+					}
+				}
 				if (data.get("UF") != null) {
 					for (String termName : data.get("UF")) {
 						term.usedFor.add(termsByName.get(termName));
@@ -191,6 +202,68 @@ public class ScotUtil {
 			throw new RuntimeException("Error parsing Scot data - please check underlying data file is valid", e);
 		}
 	}
+	
+	/** @see #create(String) */
+	public static ScotUtil createFromXml(String filePath) {
+		try {
+			FileInputStream in = new FileInputStream(filePath);
+			try {
+				return createFromXml(in);
+			} finally {
+				in.close();
+			}
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	/** @see #create(InputStream)) */
+	public static ScotUtil createFromXml(InputStream scotFileDataInputStream) {
+		try {
+			Map<String, Term> termsByName = new HashMap<String, Term>();
+
+			Document document = new SAXBuilder(false).build(scotFileDataInputStream);
+			List<Element> conceptElements = XPath.selectNodes(document, "/THESAURUS/CONCEPT");
+			
+			for (Element conceptElement : conceptElements) {
+				Term term = new Term();
+				
+				term.name = conceptElement.getChild("DESCRIPTOR") != null ? conceptElement.getChildText("DESCRIPTOR") : conceptElement.getChildText("NON-DESCRIPTOR");
+				term.termNumber = Integer.parseInt(conceptElement.getChildText("TNR"));
+				term.scopeNote = conceptElement.getChildText("SN");
+				termsByName.put(term.name, term);
+			}
+			
+			for (Element conceptElement : conceptElements) {
+				String termName = conceptElement.getChild("DESCRIPTOR") != null ? conceptElement.getChildText("DESCRIPTOR") : conceptElement.getChildText("NON-DESCRIPTOR");
+				Term term = termsByName.get(termName);
+				
+				for (Element useElement : new ArrayList<Element>(conceptElement.getChildren("USE"))) {
+					term.use.add(termsByName.get(useElement.getText()));
+				}
+				
+				for (Element usedForElement : new ArrayList<Element>(conceptElement.getChildren("UF"))) {
+					term.usedFor.add(termsByName.get(usedForElement.getText()));
+				}
+				
+				for (Element broaderTermElement : new ArrayList<Element>(conceptElement.getChildren("BT"))) {
+					term.broaderTerms.add(termsByName.get(broaderTermElement.getText()));
+				}
+				
+				for (Element narrowerTermElement : new ArrayList<Element>(conceptElement.getChildren("NT"))) {
+					term.narrowerTerms.add(termsByName.get(narrowerTermElement.getText()));
+				}
+				
+				for (Element relatedTermElement : new ArrayList<Element>(conceptElement.getChildren("RT"))) {
+					term.relatedTerms.add(termsByName.get(relatedTermElement.getText()));
+				}
+			}
+
+			return new ScotUtil(termsByName);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
 
 	public static class Term {
 		private Integer termNumber; // mandatory
@@ -198,7 +271,7 @@ public class ScotUtil {
 
 		private String scopeNote; // often null
 
-		private Term use; // if not null, this term is "non-preferred"
+		private List<Term> use = new ArrayList<Term>() ; // if not empty, this term is "non-preferred"
 
 		private List<Term> usedFor = new ArrayList<Term>(); // references to non-preferred terms that this term replaces
 		private List<Term> broaderTerms = new ArrayList<Term>(); // parent terms
@@ -233,15 +306,15 @@ public class ScotUtil {
 		public void setScopeNote(String scopeNote) {
 			this.scopeNote = scopeNote;
 		}
-
-		public Term getUse() {
+		
+		public List<Term> getUse() {
 			return use;
 		}
 
-		public void setUse(Term use) {
+		public void setUse(List<Term> use) {
 			this.use = use;
 		}
-
+		
 		public List<Term> getUsedFor() {
 			return usedFor;
 		}

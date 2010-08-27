@@ -5,7 +5,7 @@
 	<artifactId>EdAuUtils</artifactId>
 	<packaging>jar</packaging>
 	<name>EdAuUtils</name>
-	<version>0.9.10-SNAPSHOT</version>
+	<version>0.9.11-SNAPSHOT</version>
 	<url>http://code.google.com/p/educationau-utils/</url>
 	<description>education.au Utilities</description>
 	
@@ -195,6 +195,12 @@
             <groupId>rome</groupId>
             <artifactId>rome</artifactId>
             <version>1.0</version>
+            <exclusions>
+				<exclusion>
+					<groupId>jdom</groupId>
+					<artifactId>jdom</artifactId>
+				</exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>rome</groupId>
@@ -216,9 +222,20 @@
         <dependency>
             <groupId>org.hibernate</groupId>
             <artifactId>hibernate</artifactId>
-            <version>3.2.1.ga</version>
-        </dependency>		
-		
+            <version>3.2.6.ga</version>
+        </dependency>
+	
+		<dependency>
+			<groupId>jdom</groupId>
+			<artifactId>jdom</artifactId>
+			<version>1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>jaxen</groupId>
+			<artifactId>jaxen</artifactId>
+			<version>1.1.1</version>
+		</dependency>		
+			
 	</dependencies>
 	
 	<profiles>
